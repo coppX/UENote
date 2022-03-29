@@ -1,3 +1,4 @@
+# UE大纲（草稿）
 # 委托(Delegate)
 ## 类型
 - 单播: TDelegate模板类，通常用DECLARE_DELEGATE以及DECLARE_DELEGATE_XXXParams宏声明，后面的宏表示带XXX个参数
@@ -48,3 +49,29 @@
 ## 序列化
 ## 垃圾回收
 ## 反射
+
+# 模块
+
+# UHT说明符
+## UPROPERTY
+- EditAnyWhere: 在编辑器中可见，且可编辑
+- EditDefaultsOnly: 只在类默认设置中可见
+- EditInstanceOnly：可通过属性窗口进行编辑，但只能在实例上进行，不能在原型上进行编辑
+- VisibleAnywhere: 在编辑器中可见，但不能编辑
+- BlueprintReadOnly: 蓝图只读
+- BlueReadWrite: 蓝图可读写
+- Replicated：应通过网络复制该属性
+- ReplicatedUsing=FunctionName: 说明符指定一个回调函数，该函数在通过网络更新属性时执行。
+
+## UFUNCTION
+- BlueprintCallable：此函数可在蓝图或关卡蓝图中调用
+- BlueprintPure：此函数不对拥有它的对象产生任何影响，可在蓝图或关卡蓝图图表中执行
+- BlueprintimplementableEvent：需要在蓝图里面重载，不能在C++里面实现
+- BlueprintNativeEvent：此函数旨在被蓝图覆盖掉，但是也具有默认原生实现，用于声明名称与主函数相同的附加函数，但是末尾添加了_Implementaion,是写入代码的位置，如果未找到任何蓝图覆盖，该自动生成的代码将调用Implementaion方法
+- CallInEditor：通过细节(detail)面板中的按钮在编辑器中的选定实例上调用此函数
+- Server: 该函数仅在服务器上执行。声明一个与主函数同名的附加函数，但末尾添加了_Implementation，。自动生成的代码将在必要时调用该方法。
+- Client:  该函数仅在客户端上执行。声明一个与主函数同名的附加函数，但末尾添加了_Implementation，。自动生成的代码将在必要时调用该方法。
+- Reliable:该功能通过网络复制，并且无论带宽或网络错误如何，都保证到达。仅当与Client或Server结合使用时才有效。
+- Unreliable:该功能通过网络复制，但由于带宽限制或网络错误而失败。仅当与Client或Server结合使用时才有效。
+- WithValidation:声明一个与主函数同名的附加函数，末尾添加_Validatebool。此函数采用相同的参数，并返回bool以指示是否应继续调用主函数。
+- NetMulticast:该函数在服务器上本地执行，并复制到所有客户端，而不考虑Actor的NetOwner。 
