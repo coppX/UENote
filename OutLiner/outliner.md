@@ -53,6 +53,15 @@ PlayerState继承于AInfo，用来保存玩家的数据，比如玩家姓名、�
 ### 成员变量计算
 需要同步的Actor里面有很多成员变量，但是并不是所有的变量都需要同步，只有被标记为Replicated的成员变量，并且当它的值发生变化的时候才会同步给相关的客户端。并且还有额外标记控制同步，比如bNetInit标记只在刚建立起同步通道时才会同步。
 ## RPC调用
+
+RPC的声明有三种:
+- 将某函数声明为在服务器上调用，但在客户端执行: UFUNCTION(Client)
+- 将某函数声明为在客户端上调用，但在服务器执行: UFUNCTION(Server)
+- 从服务器调用，在服务器和当前所有连接的n个客户端上执行(共n + 1): UFUNCTION(NetMulticast)
+
+RPC默认不可靠，如果要在远端保证调用，则添加关键字Reliable  
+UFUNCTION(Server, Reliable)
+
 ### 可靠RPC
 ### 非可靠RPC
 ## ReplicationGraph
