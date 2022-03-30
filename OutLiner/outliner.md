@@ -192,14 +192,14 @@ public:
     // 任务的执行逻辑，其中参数：
     //  CurrentThread - 任务执行的线程类型信息
     //  MyCompletionGraphEvent - 该任务的后续任务，可以通过DontCompleteUntil让其挂起直到后续后续任务完成再继续
-	void DoTask(ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
-	{
-		MyCompletionGraphEvent->DontCompleteUntil(TGraphTask<FSomeChildTask>::CreateTask(NULL,CurrentThread).ConstructAndDispatchWhenReady());
-	}
+    void DoTask(ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
+    {
+        MyCompletionGraphEvent->DontCompleteUntil(TGraphTask<FSomeChildTask>::CreateTask(NULL,CurrentThread).ConstructAndDispatchWhenReady());
+    }
 };
 ```
 说明:
-- GetStatId: 固定写法，RETURN_QUICK_DECLARE_CYCLE_STAT第一个参数为类名>
+- GetStatId: 固定写法，RETURN_QUICK_DECLARE_CYCLE_STAT第一个参数为类名
 - GetDesiredThread: 可以指定使用哪种线程来执行这个任务。除了AnyThread还有GameThread, RHIThread, AudioThread等多种线程种类。
 - GetSubsequentsMode::TrackSubsequents: 追踪完成状态，一般用这个，说明存在后续任务
 - GetSubsequentsMode::FireAndForget: 不需要追踪任务完成状态，只有没有任何依赖的Task才用。
@@ -214,8 +214,25 @@ public:
 - FNamedTaskThread: 放到有名字的线程里面，会被放到骑本身维护的队列里面，通过FThreadTaskQueue来处理执行顺序，一旦放到这个队列里面，我们就无法随意调整任务了。
   
 ### 任务依赖
+一个任务依赖于多个事件，当多个事件全部触发之后才会执行这个任务。多个事件怎么来的呢，这些事件是前面的任务完成后才会触发的，每个任务完成都会触发一个事件，所以就能实现后面的任务依赖于前面的任务完成这个功能。  
+- 设置依赖事件
+```cpp
+static FConstructor CreateTask(const FGraphEventArray* Prerequisites = NULL, ENamedThreads::Type CurrentThreadIfKnown = ENamedThreads::AnyThread)
+{
+    int32 NumPrereq = Prerequisites ? Prerequisites->Num() : 0;
+    if (sizeof(TGraphTask) <= FBaseGraphTask::SMALL_TASK_SIZE)
+    {
+	    void *Mem = FBaseGraphTask::GetSmallTaskAllocator().Allocate();
+	    return FConstructor(new (Mem) TGraphTask(TTask::GetSubsequentsMode() == ESubsequentsMode::FireAndForget ? NULL : FGraphEvent::CreateGraphEvent(), NumPrereq), Prerequisites, CurrentThreadIfKnown);
+    }
+    return FConstructor(new TGraphTask(TTask::GetSubsequentsMode() == ESubsequentsMode::FireAndForget ? NULL : FGraphEvent::CreateGraphEvent(), NumPrereq), Prerequisites, CurrentThreadIfKnown);
+}
 
-
+FGraphEventRef Join = TGraphTask<FVictoryTestTask>::CreateTask(NULL, ENamedThread::GameThread).ConstructAndDispatchWhenReady();
+FTaskGraphInterface::Get().WaitUntilTaskCompletes(Join, ENamedThreads::GameThread_Local);
+```
+CreateTask第一个参数就是该任务的依赖事件数组(这里为NULL)，如果传入一个事件数组的话，那么当前任务就会通过SetupPrereqs函数设置这些依赖事件，并且在所有的依赖事件都触发后再将该任务放到任务队列里面分配给线程执行。  
+当执行CreateTask时，会通过FGraphEvent::CreateGraphEvent()构建一个新的后续事件，然后通过ConstructAndDispatchWhenReady我们就能得到这个后续事件Join，我们在下面通过WaitUntilTaskCompletes等待该任务结束并且触发事件Join后继续执行。当前面这个事件完成后，就会调用DispatchSubsequents()去触发他后续的任务。
 # UObject
 ## 序列化
 ## 垃圾回收
