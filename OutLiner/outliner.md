@@ -156,7 +156,6 @@ void ATestAsyncActor::ATestAsyncTaskClass()
 
 
 上面的Task继承于FNonAbandonableTask,当FAsyncTask销毁的时候，会调用Abandon函数，如果FAsyncTask里面的Task继承于FNonAbandonableTask的话，这个时候就不会丢弃而是等待执行完成才会完成FAsynTask的销毁。如果不需要丢弃任务则不能继承FNonAbandonableTask，需要自己实现CanAbondon和Abandon函数。
-## Async
 ## TaskGraph
 TaskGraph就比前面几种要复杂了，他可以创建多个线程任务，并且指定各个任务之间的依赖关系，按照该关系来处理任务。虽然各个任务直接有复杂的关系，但是和前面几种也类似，需要我们自己创建任务类型，每种类型里面实现DoTask函数来表示要执行的任务类型，比如FTickFunctionTask、FReturnGraphTask等任务，我们先创建一个任务
 ```cpp
@@ -215,15 +214,16 @@ public:
   
 ### 任务依赖
 一个任务依赖于多个事件，当多个事件全部触发之后才会执行这个任务。多个事件怎么来的呢，这些事件是前面的任务完成后才会触发的，每个任务完成都会触发一个事件，所以就能实现后面的任务依赖于前面的任务完成这个功能。  
-- 设置依赖事件
+
+设置依赖事件
 ```cpp
 static FConstructor CreateTask(const FGraphEventArray* Prerequisites = NULL, ENamedThreads::Type CurrentThreadIfKnown = ENamedThreads::AnyThread)
 {
     int32 NumPrereq = Prerequisites ? Prerequisites->Num() : 0;
     if (sizeof(TGraphTask) <= FBaseGraphTask::SMALL_TASK_SIZE)
     {
-	    void *Mem = FBaseGraphTask::GetSmallTaskAllocator().Allocate();
-	    return FConstructor(new (Mem) TGraphTask(TTask::GetSubsequentsMode() == ESubsequentsMode::FireAndForget ? NULL : FGraphEvent::CreateGraphEvent(), NumPrereq), Prerequisites, CurrentThreadIfKnown);
+        void *Mem = FBaseGraphTask::GetSmallTaskAllocator().Allocate();
+        return FConstructor(new (Mem) TGraphTask(TTask::GetSubsequentsMode() == ESubsequentsMode::FireAndForget ? NULL : FGraphEvent::CreateGraphEvent(), NumPrereq), Prerequisites, CurrentThreadIfKnown);
     }
     return FConstructor(new TGraphTask(TTask::GetSubsequentsMode() == ESubsequentsMode::FireAndForget ? NULL : FGraphEvent::CreateGraphEvent(), NumPrereq), Prerequisites, CurrentThreadIfKnown);
 }
@@ -233,6 +233,12 @@ FTaskGraphInterface::Get().WaitUntilTaskCompletes(Join, ENamedThreads::GameThrea
 ```
 CreateTask第一个参数就是该任务的依赖事件数组(这里为NULL)，如果传入一个事件数组的话，那么当前任务就会通过SetupPrereqs函数设置这些依赖事件，并且在所有的依赖事件都触发后再将该任务放到任务队列里面分配给线程执行。  
 当执行CreateTask时，会通过FGraphEvent::CreateGraphEvent()构建一个新的后续事件，然后通过ConstructAndDispatchWhenReady我们就能得到这个后续事件Join，我们在下面通过WaitUntilTaskCompletes等待该任务结束并且触发事件Join后继续执行。当前面这个事件完成后，就会调用DispatchSubsequents()去触发他后续的任务。
+## 使用建议
+对于消耗大的，复杂的任务不建议使用TaskGraph，一是因为TaskGraph如果被分配到游戏线程会阻塞整个游戏线程，二是因为不在有名字的线程上执行，也可能会影响到其他游戏逻辑，比如物理计算相关的任务就是在没有名字的线程上执行。复杂任务建议用FRunnable或者AsyncTask，因为AsyncTask都是使用新建的线程池里面的线程，一般与游戏tick无关，对于简单的任务，或者具有依赖关系的线程就放到TaskGraph里面使用。  
+不要在非游戏线程里面进行以下操作:
+- 不要Spawn/Modify/delete UObjects AActors
+- 不要使用定时器TimerManager
+- 不要使用绘制接口
 # UObject
 ## 序列化
 ## 垃圾回收
