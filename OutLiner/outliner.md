@@ -69,7 +69,7 @@ RPC的声明有三种:
 
 ### RPC分类
 - 可靠RPC：UE会用UDP模仿TCP协议，来保证RPC严格按序到达远端，适用于对GamePlay很关键但不经常调用的函数，包括碰撞事件、武器发射的开始或结束，或生成Actor
-- 非可靠RPC: UE只管发送RPC调用请求，并不保证一定到达, 但发送的速度和频率要高于可靠RPC, 用于对GamePlay而言不重要或者经常调用的函数，比如Actor移动每帧都可能变换，因此使用非可靠RPC复制该Actor移动。  
+- 非可靠RPC: UE只管发送RPC调用请求，并不保证一定到达, 但发送的速度和频率要高于可靠RPC, 用于对GamePlay而言不重要或者经常调用的函数，比如Actor移动每帧都可能变换，因此使用非可靠RPC复制该Actor移动。    
 注: 滥用可靠RPC可能会导致其队列溢出，此操作将强制断开连接。若逐帧调用RPC，应将其设为不可靠。若拥有与玩家输入绑定的可靠RPC，应该限制玩家调用该函数的频率。  
 
 TCP连接的优点是可靠稳定，但速度慢这个缺点导致他不适合网游。所以UE在UDP的基础上融合了TCP的特点，加入了乱序崇礼，以及对Reliable的丢包重传机制，既保证了可靠性，也保证了传输速度。  
@@ -94,8 +94,34 @@ Actor的网络角色将决定游戏运行期间控制Actor的机器
 ## 断线重连
 ## ReplicationGraph
 # 多线程
-## FRunable
+## FRunnable
+FRunnable是UE最基础的线程用法
+```cc
+class CORE_API FRunnable
+{
+public:
+    virtual bool Init();
+    virtual uint32 Run() = 0;
+    virtual void Stop();
+    virtual void Exit();
+    virtual class FSingleThreadRunnable* GetSingleThreadInterface();
+	virtual ~FRunnable()
+};
+```
+我们自定义一个继承于FRunnable类型的类，并且需要实现Run接口，这个Run接口就是我们需要线程去执行的函数，这个类型就相当于对线程执行函数进行了封装，真正的线程执行函数是这个Run。而执行这个线程函数的线程确实是FRunnableThread，具体用法如下:
+```
+void ATestRunnableActor::BeginPlay()
+{
+    Super::BeginPlay();
+    FTestRunnable* Runnable1 = new FTestRunnable(TEXT("线程1"), this);
+    FTestRunnable* Runnable2 = new FTestRunnable(TEXT("线程2"), this);
+    FRunnableThread* RunnableThread1 = FRunnableThread::Create(Runnable1, *Runnable1->MyThreadName);
+    FRunnableThread* RunnableThread2 = FRunnableThread::Create(Runnable2, *Runnable2->MyThreadName);
+}
+```
+FRunnable（线程执行体）和FRunnableThread（线程类）是最简单的实现多线程方式，它只有创建、暂停、销毁、等待完成等基础功能。在实战中也较少用到。
 ## AsyncTask
+
 ## Async
 ## TaskGraph
 
