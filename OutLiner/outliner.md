@@ -123,7 +123,7 @@ FRunnable（线程执行体）和FRunnableThread（线程类）是最简单的�
 ## AsyncTask
 AsyncTask是利用的UE底层的线程库来执行的，可以分为FAsyncTask和FAutoDeleteAsyncTask
 ### FAsyncTask
-FAsyncTask是一个模板类，真正的AsyncTask需要你自己写，FAsyncTask和AsyncTask的关系类似于上面的FRunnable和FRunnableThread，也是需要定义一个AsyncTask子类，并且实现DoWork，然后用子类去实例化FAsyncTask模板，FAsyncTask模板就会调用DoWork执行任务
+FAsyncTask是一个模板类，真正的AsyncTask需要你自己写，FAsyncTask和AsyncTask的关系类似于上面的FRunnableThread和FRunnable，也是需要定义一个AsyncTask子类，并且实现DoWork，然后用子类去实例化FAsyncTask模板，FAsyncTask模板就会调用DoWork执行任务
 ### FAutoDeleteAsyncTask
 FAutoDeleteAsyncTask和FAsyncTask几乎一样，不同的是FAutoDeleteAsyncTask执行完任务后会自动删除
 
@@ -139,11 +139,12 @@ class FTestAsyncTask : public FNonAbandonableTask
         ...
     }
     ...
-}
+};
 
 void ATestAsyncActor::ATestAsyncTaskClass()
 {
-    // 这里的FAutoDeleteAsyncTask也可以换成FAsyncTask
+    (new FAsyncTask<FTestAsyncTask>())->StartBackgoundTask();
+    (new FAsyncTask<FTestAsyncTask>())->StartSynchronousTask();
     (new FAutoDeleteAsyncTask<FTestAsyncTask>())->StartBackgoundTask();
     (new FAutoDeleteAsyncTask<FTestAsyncTask>())->StartSynchronousTask();
 }
@@ -157,6 +158,63 @@ void ATestAsyncActor::ATestAsyncTaskClass()
 上面的Task继承于FNonAbandonableTask,当FAsyncTask销毁的时候，会调用Abandon函数，如果FAsyncTask里面的Task继承于FNonAbandonableTask的话，这个时候就不会丢弃而是等待执行完成才会完成FAsynTask的销毁。如果不需要丢弃任务则不能继承FNonAbandonableTask，需要自己实现CanAbondon和Abandon函数。
 ## Async
 ## TaskGraph
+TaskGraph就比前面几种要复杂了，他可以创建多个线程任务，并且指定各个任务之间的依赖关系，按照该关系来处理任务。虽然各个任务直接有复杂的关系，但是和前面几种也类似，需要我们自己创建任务类型，每种类型里面实现DoTask函数来表示要执行的任务类型，比如FTickFunctionTask、FReturnGraphTask等任务，我们先创建一个任务
+```cpp
+class FMyTestTask
+{
+public:
+    FMyTestTask() {}
+    static const TCHAR* GetTaskName() { return TEXT("MyTestTask"); }
+    FORCEINLINE static TStatId GetStatId()
+    {
+        return RETURN_QUICK_DECLARE_CYCLE_STAT(FMyTestTask, STATGROUP_TaskGraphTasks);
+    }
+
+    static ENamedThreads::Type GetDesiredThread()
+    {
+        return ENamedThreads::AnyThread;
+    }
+    /*
+    namespace ESubsequentsMode
+    {
+        enum Type
+        {
+            TrackSubsequents,
+            FireAndForget
+        };
+    }
+    */
+    static ESubsequentsMode::Type GetSubsequentsMode()
+	{
+		return ESubsequentsMode::TrackSubsequents;
+	}
+ 
+    // 任务的执行逻辑，其中参数：
+    //  CurrentThread - 任务执行的线程类型信息
+    //  MyCompletionGraphEvent - 该任务的后续任务，可以通过DontCompleteUntil让其挂起直到后续后续任务完成再继续
+	void DoTask(ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
+	{
+		MyCompletionGraphEvent->DontCompleteUntil(TGraphTask<FSomeChildTask>::CreateTask(NULL,CurrentThread).ConstructAndDispatchWhenReady());
+	}
+};
+```
+说明:
+- GetStatId: 固定写法，RETURN_QUICK_DECLARE_CYCLE_STAT第一个参数为类名>
+- GetDesiredThread: 可以指定使用哪种线程来执行这个任务。除了AnyThread还有GameThread, RHIThread, AudioThread等多种线程种类。
+- GetSubsequentsMode::TrackSubsequents: 追踪完成状态，一般用这个，说明存在后续任务
+- GetSubsequentsMode::FireAndForget: 不需要追踪任务完成状态，只有没有任何依赖的Task才用。
+- DoWork: 任务执行体
+- FGraphEventRef:是FGraphEvent的指针，用来传递任务完成状态的，比如我上一个任务完成了就把完成时间传给我这个任务，我这个任务就能开始执行了，我完成了任务，我就会把完成事件传递给下一个任务(如果有)。
+
+线程在TaskGraph里面被称为FWorkerThread，通过全局单例类FTaskGraphImplementation来创建和分配任务的，默认情况下会开启5个基本线程StatThread、RHIThread、AudioThread、GameThread、ActualRenderingThread，还有其他无名的线程。FWorkerThread里面其实封装的FRunnableThread类型成员就是真正的线程，FWorkerThread还封装了FTaskThreadBase类型成员，它继承于FRannable线程执行体。FTaskThreadBase有两个子类FTaskThreadAnyThread和FNamedTaskThread，对应着有名字的(比如上面五个基本线程)和没有名字的线程执行体。  
+
+### 单个线程中任务执行顺序
+如果我们将多个任务放到一个线程里面，他们的执行顺序是怎样的。
+- FTaskThreadAnyThread: 放到无名线程里面，会在创建任务的时候按照优先级放到IncomingAnyThread数组里面，然后每次线程执行完成后从这个数组里面弹出一个未执行的任务来执行，我们可以随时修改和调整这个任务队列。
+- FNamedTaskThread: 放到有名字的线程里面，会被放到骑本身维护的队列里面，通过FThreadTaskQueue来处理执行顺序，一旦放到这个队列里面，我们就无法随意调整任务了。
+  
+### 任务依赖
+
 
 # UObject
 ## 序列化
