@@ -4,7 +4,7 @@
 - 单播: TDelegate模板类，通常用DECLARE_DELEGATE以及DECLARE_DELEGATE_XXXParams宏声明，后面的宏表示带XXX个参数
 - 多播: TMulticastDelegate模板类，通常用DECLARE_MULTICAST_DELEGATE以及DECLARE_MULTICAST_DELEGATE_XXXParams宏进行声明，后面的宏表示带有XXX个参数
 - 动态单播: TBaseDynamicDelegate模板类子类,通常用DECLARE_DYNAMIC_DELEGATE宏进行声明，DECLARE_DYNAMIC_DELEGATE_XXXParam版本的声明表示带有XXX个参数
-- 动态多播:TBaseDynamicMulticastDelegate(多播)模板类子类, 通常用和DECLARE_DYNAMIC_MULTICAST_DELEGATE宏进行声明，DECLARE_DYNAMIC_MULTICAST_DELEGATE_XXXParam版本的声明表示带有XXX个参数 
+- 动态多播:TBaseDynamicMulticastDelegate(多播)模板类子类, 通常用DECLARE_DYNAMIC_MULTICAST_DELEGATE宏进行声明，DECLARE_DYNAMIC_MULTICAST_DELEGATE_XXXParam版本的声明表示带有XXX个参数 
 - 事件: TMulticastDelegate模板子类, 可以看成是特殊的多播，只有定义该事件的类才可以调用
 
 ## 绑定
@@ -52,6 +52,14 @@ PlayerState继承于AInfo，用来保存玩家的数据，比如玩家姓名、�
 当网络不好时，会根据优先级，先同步优先级高的数据。如果带宽饱和了则当前帧就不会同步优先级低的数据，然后没有同步的数据优先级会提升，会在接下来的几帧后会被同步。
 ### 成员变量计算
 需要同步的Actor里面有很多成员变量，但是并不是所有的变量都需要同步，只有被标记为Replicated的成员变量，并且当它的值发生变化的时候才会同步给相关的客户端。并且还有额外标记控制同步，比如bNetInit标记只在刚建立起同步通道时才会同步。
+
+Actor、Pawn和Character的部分功能不会复制:
+- Skeletal Mesh和Static Mesh组件
+- 材质
+- 动画蓝图
+- 粒子系统
+- 音效发射器
+- 物理对象
 ## RPC调用
 
 RPC的声明有三种:
@@ -60,14 +68,22 @@ RPC的声明有三种:
 - 从服务器调用，在服务器和当前所有连接的n个客户端上执行(共n + 1): UFUNCTION(NetMulticast)
 
 ### RPC分类
-- 可靠RPC：UE会用UDP模仿TCP协议，来保证RPC严格按序到达远端
-- 非可靠RPC: UE只管发送RPC调用请求，并不保证一定到达
+- 可靠RPC：UE会用UDP模仿TCP协议，来保证RPC严格按序到达远端，适用于对GamePlay很关键但不经常调用的函数，包括碰撞事件、武器发射的开始或结束，或生成Actor
+- 非可靠RPC: UE只管发送RPC调用请求，并不保证一定到达, 但发送的速度和频率要高于可靠RPC, 用于对GamePlay而言不重要或者经常调用的函数，比如Actor移动每帧都可能变换，因此使用非可靠RPC复制该Actor移动。  
+注: 滥用可靠RPC可能会导致其队列溢出，此操作将强制断开连接。若逐帧调用RPC，应将其设为不可靠。若拥有与玩家输入绑定的可靠RPC，应该限制玩家调用该函数的频率。  
+
 TCP连接的优点是可靠稳定，但速度慢这个缺点导致他不适合网游。所以UE在UDP的基础上融合了TCP的特点，加入了乱序崇礼，以及对Reliable的丢包重传机制，既保证了可靠性，也保证了传输速度。  
 RPC默认不可靠，如果要在远端保证调用，则需要添加关键字Reliable  
 UFUNCTION(Server, Reliable)
 ### 可靠性
 - 丢包重传：被标记为reliable的包会在发送端保存一个备份，只有收到接收端的ACK包确认后才会清理掉，若收到ACK包跳序则就会触发重传。
 - 乱序整理：UE会在发送端为包添加序列号，在接收端会对收到的包进行排序，如果有不完整的包会等待重组。
+### 网络角色和授权
+Actor的网络角色将决定游戏运行期间控制Actor的机器
+- ROLE_None:Actor在网络游戏中没有Role，不会复制
+- ROLE_Authority：Actor为授权状态，会将信息复制给其他机器上的远程代理
+- ROLE_SimulatedProxy:Actor为远程代理，由另外一台机器上的Actor完全控制。网络游戏中如拾取物，发射物或交互对象等多数Actor将在远程客户端上显示为模拟代理
+- ROLE_AutonomousProxy：Actor为远程代理，能够本地执行部分功能，但会接收授权Actor中的矫正，自主代理通常为玩家直接控制的Actor所保留，如Pawn
 ## 属性同步 or RPC
 对于到底选择属性同步还是选择RPC来做网络同步，会根据以下几点来做选择
 - 属性同步只能是从服务端同步给客户端，不存在从客户端同步到服务端，如果需要从客户端同步数据到服务端，则采用RPC的方式，RPC是可以双向同步的。
@@ -89,6 +105,7 @@ UFUNCTION(Server, Reliable)
 ## 反射
 
 # 模块
+# Subsystem
 
 # UHT说明符
 ## UPROPERTY
