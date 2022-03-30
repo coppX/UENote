@@ -96,7 +96,7 @@ Actor的网络角色将决定游戏运行期间控制Actor的机器
 # 多线程
 ## FRunnable
 FRunnable是UE最基础的线程用法
-```cc
+```cpp
 class CORE_API FRunnable
 {
 public:
@@ -109,7 +109,7 @@ public:
 };
 ```
 我们自定义一个继承于FRunnable类型的类，并且需要实现Run接口，这个Run接口就是我们需要线程去执行的函数，这个类型就相当于对线程执行函数进行了封装，真正的线程执行函数是这个Run。而执行这个线程函数的线程确实是FRunnableThread，具体用法如下:
-```
+```cpp
 void ATestRunnableActor::BeginPlay()
 {
     Super::BeginPlay();
@@ -121,7 +121,40 @@ void ATestRunnableActor::BeginPlay()
 ```
 FRunnable（线程执行体）和FRunnableThread（线程类）是最简单的实现多线程方式，它只有创建、暂停、销毁、等待完成等基础功能。在实战中也较少用到。
 ## AsyncTask
+AsyncTask是利用的UE底层的线程库来执行的，可以分为FAsyncTask和FAutoDeleteAsyncTask
+### FAsyncTask
+FAsyncTask是一个模板类，真正的AsyncTask需要你自己写，FAsyncTask和AsyncTask的关系类似于上面的FRunnable和FRunnableThread，也是需要定义一个AsyncTask子类，并且实现DoWork，然后用子类去实例化FAsyncTask模板，FAsyncTask模板就会调用DoWork执行任务
+### FAutoDeleteAsyncTask
+FAutoDeleteAsyncTask和FAsyncTask几乎一样，不同的是FAutoDeleteAsyncTask执行完任务后会自动删除
 
+
+例子:
+```cpp
+class FTestAsyncTask : public FNonAbandonableTask
+{
+    friend class FAutoDeleteAsyncTask<FTestAsyncTask>;
+
+    void DoWork()
+    {
+        ...
+    }
+    ...
+}
+
+void ATestAsyncActor::ATestAsyncTaskClass()
+{
+    // 这里的FAutoDeleteAsyncTask也可以换成FAsyncTask
+    (new FAutoDeleteAsyncTask<FTestAsyncTask>())->StartBackgoundTask();
+    (new FAutoDeleteAsyncTask<FTestAsyncTask>())->StartSynchronousTask();
+}
+```
+
+这里的StartBackgroundTask和StartSynchronousTask的区别:
+- StartBackgroundTask会利用线程池里空闲的线程来执行
+- StartSynchronousTask则是主线程来执行，会阻塞主线程  
+
+
+上面的Task继承于FNonAbandonableTask,当FAsyncTask销毁的时候，会调用Abandon函数，如果FAsyncTask里面的Task继承于FNonAbandonableTask的话，这个时候就不会丢弃而是等待执行完成才会完成FAsynTask的销毁。如果不需要丢弃任务则不能继承FNonAbandonableTask，需要自己实现CanAbondon和Abandon函数。
 ## Async
 ## TaskGraph
 
