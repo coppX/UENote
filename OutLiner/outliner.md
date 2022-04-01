@@ -67,6 +67,20 @@ RPC的声明有三种:
 - 将某函数声明为在客户端上调用，但在服务器执行: UFUNCTION(Server)
 - 从服务器调用，在服务器和当前所有连接的n个客户端上执行(共n + 1): UFUNCTION(NetMulticast)
 
+### 从服务器调用的RPC
+|Actor所有权         | 未复制         | NetMulticast          | Server       | Client
+|:-----------------|:--------------|:----------------------|:-------------|:------------------|
+|Client-owned actor | 在服务器上运行  | 在服务器和所有客户端上运行 | 在服务器上运行 | 在actor所属客户端上运行|
+|Server-owned actor | 在服务器上运行  | 在服务器和所有客户端上运行 | 在服务器上运行 | 在服务器上运行 |
+|Unowned actor      | 在服务器上运行  | 在服务器和所有客户端上运行 | 在服务器上运行 | 在服务器上运行 |
+
+### 从客户端调用的RPC
+|Actor所有权                  | 未复制                 | NetMulticast         | Server       | Client
+|:---------------------------|:----------------------|:---------------------|:-------------|:--------------------|
+|owned by invoking client    | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 在服务器上运行 | 在执行调用的客户端上运行 |
+|owned by a different client | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 丢弃         | 在执行调用的客户端上运行 |
+|server-owned actor          | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 丢弃         | 在执行调用的客户端上运行 |
+|Unowned actor               | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 丢掉         | 在执行调用的客户端上运行 |
 ### RPC分类
 - 可靠RPC：UE会用UDP模仿TCP协议，来保证RPC严格按序到达远端，适用于对GamePlay很关键但不经常调用的函数，包括碰撞事件、武器发射的开始或结束，或生成Actor
 - 非可靠RPC: UE只管发送RPC调用请求，并不保证一定到达, 但发送的速度和频率要高于可靠RPC, 用于对GamePlay而言不重要或者经常调用的函数，比如Actor移动每帧都可能变换，因此使用非可靠RPC复制该Actor移动。    
@@ -81,9 +95,28 @@ UFUNCTION(Server, Reliable)
 ### 网络角色和授权
 Actor的网络角色将决定游戏运行期间控制Actor的机器
 - ROLE_None:Actor在网络游戏中没有Role，不会复制
-- ROLE_Authority：Actor为授权状态，会将信息复制给其他机器上的远程代理
+- ROLE_Authority:Actor为授权状态，会将信息复制给其他机器上的远程代理
 - ROLE_SimulatedProxy:Actor为远程代理，由另外一台机器上的Actor完全控制。网络游戏中如拾取物，发射物或交互对象等多数Actor将在远程客户端上显示为模拟代理
-- ROLE_AutonomousProxy：Actor为远程代理，能够本地执行部分功能，但会接收授权Actor中的矫正，自主代理通常为玩家直接控制的Actor所保留，如Pawn
+- ROLE_AutonomousProxy:Actor为远程代理，能够本地执行部分功能，但会接收授权Actor中的矫正，自主代理通常为玩家直接控制的Actor所保留，如Pawn  
+  
+### 连接/NetConnection
+对于任意一个Actor(客户端),他可以有连接，也可以无连接。一旦Actor有连接，他的Role就是ROLE_AutonomousProxy，如果没有连接，他的Role就是ROLE_SimulatedProxy。对于一个actor，他有三种方式来获得这个连接(或者说让自己属于这个连接):
+- 设置自己的Owner为拥有连接的PlayerController,或者自己Owner的Owner为拥有连接的PlayerController，也就是官方文档说的查找他最外层的Owner是否为PlayerController而且这个PlayerController必须拥有连接。
+- 这个Actor必须是Pawn并且Possess了拥有连接的PlayerController。
+- 这个Actor设置自己的Owner为拥有连接的Pawn。这个区别于第一点就是，Pawn与Controller的绑定方式不是通过Owner这个属性。而是Pawn本身就具有Controller这个属性(成员)，所以Pawn的Owner可能为空。
+
+对于组件来说也一样，也是通过它归宿的那个actor，然后在去找和actor相关的PlayerController，用上面的方法。我们发现连接和我们操作的对象有关，像NPC就没有连接，他们的Role就是ROLE_SimulatedProxy。
+### 连接的作用
+- RPC需要确定哪个客户端将执行运行于客户端的RPC。当服务端调用UFUNCTION(Client)时，我怎么知道应该去哪个客户端执行
+- Actor复制和连接相关性。Actor是可以同步，他的属性也是，有些东西我们就需要同步给连接的客户端
+- 在涉及所有者时的Actor属性复制条件。比如以下例子
+  ```cpp
+  void AActor::GetLifetimeReplicatedProps( TArray< FLifetimeProperty > & OutLifetimeProps ) const
+{
+  DOREPLIFETIME_CONDITION( AActor, ReplicatedMovement, COND_AutonomousOnly );
+}
+  ```
+  这里的ReplicatedMovement属性就限制在了只拥有COND_AutonomousOnly的Actor上才能同步。
 ## 属性同步 or RPC
 对于到底选择属性同步还是选择RPC来做网络同步，会根据以下几点来做选择
 - 属性同步只能是从服务端同步给客户端，不存在从客户端同步到服务端，如果需要从客户端同步数据到服务端，则采用RPC的方式，RPC是可以双向同步的。
