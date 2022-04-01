@@ -80,7 +80,18 @@ RPC的声明有三种:
 |owned by invoking client    | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 在服务器上运行 | 在执行调用的客户端上运行 |
 |owned by a different client | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 丢弃         | 在执行调用的客户端上运行 |
 |server-owned actor          | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 丢弃         | 在执行调用的客户端上运行 |
-|Unowned actor               | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 丢掉         | 在执行调用的客户端上运行 |
+|Unowned actor               | 在执行调用的客户端上运行  | 在执行调用的客户端上运行 | 丢弃         | 在执行调用的客户端上运行 |
+### RPC的调用限制
+1. 它们必须从Actor上调用
+2. Actor必须被复制
+3. 如果RPC是从服务器调用并且在客户端上执行，则只有实际拥有这个Actor的客户端才会执行函数。
+4. 如果RPC是从客户端调用并在服务器上执行，客户端就必须拥有调用RPC的Actor。
+5. 多播RPC是个例外
+- 如果它们是从服务器调用，服务器将在本地和所有已连接的客户端上执行它们。
+- 如果它们是从客户端调用，则只能在本地而非服务器上执行。  
+
+
+RPC函数参数除了UObject类型的指针以及const FString&的字符串外，其他类型的指针或者引用都不可以作为RPC的参数，RPC函数没有返回值。
 ### RPC分类
 - 可靠RPC：UE会用UDP模仿TCP协议，来保证RPC严格按序到达远端，适用于对GamePlay很关键但不经常调用的函数，包括碰撞事件、武器发射的开始或结束，或生成Actor
 - 非可靠RPC: UE只管发送RPC调用请求，并不保证一定到达, 但发送的速度和频率要高于可靠RPC, 用于对GamePlay而言不重要或者经常调用的函数，比如Actor移动每帧都可能变换，因此使用非可靠RPC复制该Actor移动。    
@@ -99,6 +110,7 @@ Actor的网络角色将决定游戏运行期间控制Actor的机器
 - ROLE_SimulatedProxy:Actor为远程代理，由另外一台机器上的Actor完全控制。网络游戏中如拾取物，发射物或交互对象等多数Actor将在远程客户端上显示为模拟代理
 - ROLE_AutonomousProxy:Actor为远程代理，能够本地执行部分功能，但会接收授权Actor中的矫正，自主代理通常为玩家直接控制的Actor所保留，如Pawn  
   
+Actor存在Role和RemoteRole，Role是本地的，RemoteRole是对应端，比如Role是客户端ROLE_AutonomousProxy，RemoteRole就是ROLE_Authority。
 ### 连接/NetConnection
 对于任意一个Actor(客户端),他可以有连接，也可以无连接。一旦Actor有连接，他的Role就是ROLE_AutonomousProxy，如果没有连接，他的Role就是ROLE_SimulatedProxy。对于一个actor，他有三种方式来获得这个连接(或者说让自己属于这个连接):
 - 设置自己的Owner为拥有连接的PlayerController,或者自己Owner的Owner为拥有连接的PlayerController，也就是官方文档说的查找他最外层的Owner是否为PlayerController而且这个PlayerController必须拥有连接。
