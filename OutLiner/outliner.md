@@ -128,7 +128,7 @@ Actor存在Role和RemoteRole，Role是本地的，RemoteRole是对应端，比�
         DOREPLIFETIME_CONDITION( AActor, ReplicatedMovement, COND_AutonomousOnly );
     }
   ```
-  这里的ReplicatedMovement属性就限制在了只拥有COND_AutonomousOnly的Actor上才能同步。
+  这里的ReplicatedMovement属性就限制在了只拥有COND_AutonomousOnly的Actor上才能同步,这种条件一般只在Actor初始化的时候同步一次，接下来的游戏过程中不会同步，一般在同步玩家的姓名性别这种不会改变属性的场景下会用，如果游戏过程中改变了，就需要手动调用函数来同步，这样就能减少同步消耗。
 ## 属性同步 or RPC
 对于到底选择属性同步还是选择RPC来做网络同步，会根据以下几点来做选择
 - 属性同步只能是从服务端同步给客户端，不存在从客户端同步到服务端，如果需要从客户端同步数据到服务端，则采用RPC的方式，RPC是可以双向同步的。
