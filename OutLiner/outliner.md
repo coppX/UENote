@@ -123,10 +123,10 @@ Actor存在Role和RemoteRole，Role是本地的，RemoteRole是对应端，比�
 - Actor复制和连接相关性。Actor是可以同步，他的属性也是，有些东西我们就需要同步给连接的客户端
 - 在涉及所有者时的Actor属性复制条件。比如以下例子
   ```cpp
-  void AActor::GetLifetimeReplicatedProps( TArray< FLifetimeProperty > & OutLifetimeProps ) const
-{
-  DOREPLIFETIME_CONDITION( AActor, ReplicatedMovement, COND_AutonomousOnly );
-}
+    void AActor::GetLifetimeReplicatedProps( TArray< FLifetimeProperty > & OutLifetimeProps ) const
+    {
+        DOREPLIFETIME_CONDITION( AActor, ReplicatedMovement, COND_AutonomousOnly );
+    }
   ```
   这里的ReplicatedMovement属性就限制在了只拥有COND_AutonomousOnly的Actor上才能同步。
 ## 属性同步 or RPC
