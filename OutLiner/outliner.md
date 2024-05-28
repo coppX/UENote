@@ -97,7 +97,7 @@ RPC函数参数除了UObject类型的指针以及const FString&的字符串外�
 - 非可靠RPC: UE只管发送RPC调用请求，并不保证一定到达, 但发送的速度和频率要高于可靠RPC, 用于对GamePlay而言不重要或者经常调用的函数，比如Actor移动每帧都可能变换，因此使用非可靠RPC复制该Actor移动。    
 注: 滥用可靠RPC可能会导致其队列溢出，此操作将强制断开连接。若逐帧调用RPC，应将其设为不可靠。若拥有与玩家输入绑定的可靠RPC，应该限制玩家调用该函数的频率。  
 
-TCP连接的优点是可靠稳定，但速度慢这个缺点导致他不适合网游。所以UE在UDP的基础上融合了TCP的特点，加入了乱序崇礼，以及对Reliable的丢包重传机制，既保证了可靠性，也保证了传输速度。  
+TCP连接的优点是可靠稳定，但速度慢这个缺点导致他不适合网游。所以UE在UDP的基础上融合了TCP的特点，加入了乱序重连，以及对Reliable的丢包重传机制，既保证了可靠性，也保证了传输速度。  
 RPC默认不可靠，如果要在远端保证调用，则需要添加关键字Reliable  
 UFUNCTION(Server, Reliable)
 ### 可靠性
@@ -123,9 +123,9 @@ Actor存在Role和RemoteRole，Role是本地的，RemoteRole是对应端，比�
 - Actor复制和连接相关性。Actor是可以同步，他的属性也是，有些东西我们就需要同步给连接的客户端
 - 在涉及所有者时的Actor属性复制条件。比如以下例子
   ```cpp
-    void AActor::GetLifetimeReplicatedProps( TArray< FLifetimeProperty > & OutLifetimeProps ) const
+    void AActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
     {
-        DOREPLIFETIME_CONDITION( AActor, ReplicatedMovement, COND_AutonomousOnly );
+        DOREPLIFETIME_CONDITION(AActor, ReplicatedMovement, COND_AutonomousOnly);
     }
   ```
   这里的ReplicatedMovement属性就限制在了只拥有COND_AutonomousOnly的Actor上才能同步,这种条件一般只在Actor初始化的时候同步一次，接下来的游戏过程中不会同步，一般在同步玩家的姓名性别这种不会改变属性的场景下会用，如果游戏过程中改变了，就需要手动调用函数来同步，这样就能减少同步消耗。
