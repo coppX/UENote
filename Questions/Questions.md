@@ -100,7 +100,7 @@ RPC（远程过程调用），是在本地调用但能在其他机器（不同�
 - 检查场景中的碰撞是否把AI阻挡了
 - 要移动的pawn和目标点或者目标actor没有正确设置
 - 检查AIController是否为空
-- 如果AI是生成的而不是一开始就放到场景的(把AutoPossessAI设置为PlacedInWorldOrSpawned)
+- 如果AI是生成的而不是一开始就放到场景的(把AutoPossessAI设置为PlacedInWorldOrSpawned)  
 [AIMoveTo失败原因](https://blog.csdn.net/qq_41410054/article/details/130870008)
 
 # 12. 试说出宏、函数、事件的部分区别和联系。
@@ -118,37 +118,101 @@ BlueprintType:将使用该宏标志的类公开为可用于蓝图中变量的类
 与之对应的有NotBlueprintType，即不可以在蓝图中创建该类型的变量。
 
 # 15. 客户端上面对一个Actor中的RPC事件调用失败，可能原因是什么？
-
+- 该Actor不可被复制
+- 其他的客户端上，未拥有可以调用RPC的Actor。
+- 在Pawn派生类的蓝图收到Possessed事件时，Connection->ViewsTarget还未被赋值。
+[rpc调用不起作用](https://blog.csdn.net/xiaozhi0999/article/details/51489901)
 # 16. UE4中的RPC事件有哪些？
-
+RPC主要包括Multicast（广播）、Run On Server（在服务端执行）和Run On Owning Client（在客户端执行）三种类型。其中广播类型在服务器上调用执行，然后自动转发给客户端；在服务端执行的函数有客户端调用，然后仅在服务器执行。在客户端执行的函数由服务器调用，然后仅在自己的客户端上执行。
 # 17. 如何设置Actor的同步间隔？
+Actor的同步分为属性同步和RPC，属性同步会在属性变化时就会同步，而RPC只有在调用的时候才会同步。RPC的实时性比属性同步要好，RPC调用瞬间能发送远端执行，而属性同步还需要等待packet包满了之后才能发送网络请求。可以尝试修改Actor中属性NetUpdateFrequency字段以及MinNetUpdateFrequency字段，来修改同步频率。  
+[属性复制](https://docs.unrealengine.com/4.27/en-US/InteractiveExperiences/Networking/Actors/Properties/)
 
 # 18. 若需要实现一个多播事件，如何操作？
 
 # 19. 连接服务器的命令是什么，如何传递参数？
-
+![](./ClientConnectServer.png)
+如果是源代码连接服务器则
+```cpp
+Socket->Connect(*addr);
+```
 # 20. 为什么需要TWeakPtr？
+类似于C++ std::weak_ptr, 防止循环引用。使用时，Get一下判断引用的对象是否还存在。
 
 # 21. 如果要在游戏的开始和结束执行某些操作，可以在UE4哪儿处理？
-
+- 关卡开始结束, 可以放到Actor的BeginPlay和EndPlay()
+- instance Init()和Shutdown()
+- UEngine Init()和PreExit()
 # 22. UE4中，各种字符编码如何转换？
+```cpp
+    TCHAR_TO_ANSI(str)
+    TCHAR_TO_OEM(str)
+    ANSI_TO_TCHAR(str)
+    TCHAR_TO_UTF8(str)//TCHAR转UTF8
+    UTF8_TO_TCHAR(str) 
+```
 
 # 23. C++源文件中的注释在蓝图中显示为乱码，为什么？
-
+需要将C++源文件的文件编码格式改为UTF-8格式。
 # 24. 插件中的LoadingPhase是什么？
+LoadingPhase主要用于控制插件在引擎启动的何时被加载。
+```cpp
+/**
+ * Phase at which this module should be loaded during startup.
+ */
+namespace ELoadingPhase
+{
+	enum Type
+	{
+		/** As soon as possible - in other words, uplugin files are loadable from a pak file (as well as right after PlatformFile is set up in case pak files aren't used) Used for plugins needed to read files (compression formats, etc) */
+		EarliestPossible,
 
+		/** Loaded before the engine is fully initialized, immediately after the config system has been initialized.  Necessary only for very low-level hooks */
+		PostConfigInit,
+
+		/** The first screen to be rendered after system splash screen */
+		PostSplashScreen,
+
+		/** Loaded before coreUObject for setting up manual loading screens, used for our chunk patching system */
+		PreEarlyLoadingScreen,
+
+		/** Loaded before the engine is fully initialized for modules that need to hook into the loading screen before it triggers */
+		PreLoadingScreen,
+
+		/** Right before the default phase */
+		PreDefault,
+
+		/** Loaded at the default loading point during startup (during engine init, after game modules are loaded.) */
+		Default,
+
+		/** Right after the default phase */
+		PostDefault,
+
+		/** After the engine has been initialized */
+		PostEngineInit,
+
+		/** Do not automatically load this module */
+		None,
+
+		// NOTE: If you add a new value, make sure to update the ToString() method below!
+		Max
+	};
+}
+```
 # 25. 如何切换不同的引擎版本？
-
+选中项目.uproject文件->鼠标右键->Switch Unreal Engine Version
 # 26. 对于一个团队项目，如何处理DDC？
-
+DDC为派生数据缓存。
+如果是同一地点的团队或者是小团队，可以设置共享DDC。此为所有团队成员和构建计算机均可读取/写入的网络驱动器。如果是大型项目，并希望分发预构建DDC数据，则应该生成DDC pak。
 # 27. UFUNCTION，UPROPERTY等宏的作用是什么？
 
 # 28. 如何给AI增加playerstate？
+默认情况下，只有玩家才有playerState, 如果想让AI也有PlayerState, 修改AIController下的bWantsPlayerState属性为true，就能让AIController使用playerState了
 
 # 29. ProjectileComponent是否同步？若未同步，如何操作？
-
+不是同步的，需要通过RPC进行同步。
 # 30. 若要更改某个Actor中的组件为其派生的组件，如何操作？
-
+在一开始将该父类组件申明为指针，当要更改时，直接指向其派生的组件对象即可。
 # 31. UE4的游戏框架包含哪些内容？
 
 # 32. 当前UE4在移动平台上面的问题有哪些？
