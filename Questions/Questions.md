@@ -35,7 +35,7 @@ public:
 # 3. BlueprintCallable和BlurprintPure在什么时候使用？
 BlueprintImplementableEvent和BlueprintNativeEvent是在C++中调用蓝图的实现，而BlueprintCallable和BlurprintPure是在蓝图中调用C++的实现
 ```cpp
----- .h ----
+//---- .h ----
 // 普通函数
 UFUNCTION(BlueprintCallable)
 void TestFuncionA(int InValue1, float InValue2, int& OutValue1, float& OutValue2);
@@ -43,7 +43,7 @@ void TestFuncionA(int InValue1, float InValue2, int& OutValue1, float& OutValue2
 UFUNCTION(BlueprintPure)
 void TestFuncionB(int InValue1, float InValue2, int& OutValue1, float& OutValue2);
 
----- .cpp ----
+//---- .cpp ----
 void ATestActor::TestFuncionA(int InValue1, float InValue2, int& OutValue1, float& OutValue2)
 {
 }
@@ -52,7 +52,7 @@ void ATestActor::TestFuncionB(int InValue1, float InValue2, int& OutValue1, floa
 }
 
 ```
-![](./BlueprintCallable.png)
+![](./BlueprintCallable.png)  
 BlueprintCallable和BlueprintPure的区别是，如果函数的UFUNCTION中用了BlueprintPure标记则表示这是个纯函数，在蓝图这边不能看到target引脚。如果换成BlueprintCallable则表示是个普通的函数  
 
 # 4. UE4的蓝图中对于Foreach等循环采用的是类似并行的方式，试实现一个串行的方法。
@@ -120,7 +120,7 @@ BlueprintType:将使用该宏标志的类公开为可用于蓝图中变量的类
 # 15. 客户端上面对一个Actor中的RPC事件调用失败，可能原因是什么？
 - 该Actor不可被复制
 - 其他的客户端上，未拥有可以调用RPC的Actor。
-- 在Pawn派生类的蓝图收到Possessed事件时，Connection->ViewsTarget还未被赋值。
+- 在Pawn派生类的蓝图收到Possessed事件时，Connection->ViewsTarget还未被赋值。  
 [rpc调用不起作用](https://blog.csdn.net/xiaozhi0999/article/details/51489901)
 # 16. UE4中的RPC事件有哪些？
 RPC主要包括Multicast（广播）、Run On Server（在服务端执行）和Run On Owning Client（在客户端执行）三种类型。其中广播类型在服务器上调用执行，然后自动转发给客户端；在服务端执行的函数有客户端调用，然后仅在服务器执行。在客户端执行的函数由服务器调用，然后仅在自己的客户端上执行。
@@ -141,7 +141,7 @@ Socket->Connect(*addr);
 
 # 21. 如果要在游戏的开始和结束执行某些操作，可以在UE4哪儿处理？
 - 关卡开始结束, 可以放到Actor的BeginPlay和EndPlay()
-- instance Init()和Shutdown()
+- GameInstance Init()和Shutdown()
 - UEngine Init()和PreExit()
 # 22. UE4中，各种字符编码如何转换？
 ```cpp
@@ -210,33 +210,59 @@ DDC为派生数据缓存。
 默认情况下，只有玩家才有playerState, 如果想让AI也有PlayerState, 修改AIController下的bWantsPlayerState属性为true，就能让AIController使用playerState了
 
 # 29. ProjectileComponent是否同步？若未同步，如何操作？
-不是同步的，需要通过RPC进行同步。
+如果ProjectileComponent是指的UProjectileMovementComponent，则不是同步的，虽然说ProjectileComponent是继承自UActorComponent，具备了同步的能力，但是他没有开启SetIsReplicated(true)
+想要component开启网络同步的能力
+- Component必须以Actor的方式来实施::GetLifetimeReplicatedProps函数
+- 在Component里面设置AActorComponent::SetIsReplicated(true)
+或者在ProjectileComponent执行一个操作后通过RPC来同步操作的结果。
 # 30. 若要更改某个Actor中的组件为其派生的组件，如何操作？
 在一开始将该父类组件申明为指针，当要更改时，直接指向其派生的组件对象即可。
 # 31. UE4的游戏框架包含哪些内容？
-
+- Pawn 兵卒，设计给玩家操作的对象抽象，Pawn由Controller拥有，可以接受输入，pawn不被认定为具有人的特性
+- Character Character是带有人形风格的Pawn，Character继承于Pawn，默认情况下，带有一个拥有碰撞的CapsuleComponent和一个用于移动的CharacterMovementComponent组件
+- Controller 控制Pawn的行为，继承自AActor，Controller有两种，一种是PlayerController，一种是AIController，PlayerController用来控制Pawn，需要玩家手动来控制。而AIController控制Pawn时，是计算机用来控制NPC的行为。
+- GameMode 继承于AInfo，承担了游戏玩法的职责，包括游戏的开始结束，游戏内实体的Spawn(包括Pawn，PlayerController,AIController也是由GameMode负责Spawn)，关卡切换，只存在于服务器，然后Replicated到所有客户端
+- GameState 继承于AInfo，用来保存当前游戏的状态数据，其中可以包括联网玩家列表、得分、棋类游戏中棋子的位置，或者开放时间场景中完成任务的列表等。存在于服务端，然后也可以Replicated到多个客户端。
+- PlayerState 继承于AInfo，用来保存玩家的数据，比如玩家姓名、得分、MOBA等比赛中等级，PlayerState存在客户端，所有玩家的PlayerState存在于所有的机器上，并且可以Replicated以保存同步
 # 32. 当前UE4在移动平台上面的问题有哪些？
 
 # 33. 如何获取UE4的源码？
-
+- 登录Unreal Engine获取github授权，加入EpicGames组织
+- git clone https://github.com/EpicGames/UnrealEngine
 # 34. UE4服务器的默认监听端口是哪一个？采用的是UDP还是TCP协议？
-
+默认监听端口7777，采用的UDP协议
 # 35. Tick中的帧时间是否可靠？若不可靠，如何操作？
-
+不可靠，因为游戏运行过程中，帧率并不是稳定的，而tick的帧时间表示的是距离上一帧过去了多久。可以用每秒需要的变化量，乘以deltaTime来平衡掉帧的影响。  
+例如,需求每秒钟移动30m，如果帧数稳定为100，则每帧应该加30/100 = 0.3m, 但是实际帧率不稳定，若1s内在0.2s, 0.5s, 0.96s 1s调用了此方法，即，这1s点平均帧数为4fps, 那么每次调用前进的距离应该为0.2 * 30 + 0.3 * 30 + 0.46 * 30 + 0.04 * 30 = 30。则每帧移动deltaTime * 30
 # 36. UE4的打包方法有哪些？
-
+- UE编辑器打包
+- RunUAT打包 RunUAT是UE4提供的一个命令行工具，用于自动化打包过程。用户可以通过编写批处理脚本（.bat文件）来调用RunUAT，并指定一系列参数来控制打包的过程。这些参数包括项目路径、平台、配置模式（开发、发行等）、是否烘焙地图、输出目录等。通过RunUAT，用户可以实现更灵活的打包配置，适用于不同的需求和场景。
 # 37. 如何制作差异包或者补丁？
 
 # 38. 试说出Selector、Sequence、Parallel的运作流程。
 
 # 39. UE4中的AI感知组件有哪些？
+- 伤害的感知 AI Damage sense config
+- 听觉的感知 AI Hearing config
+- 预测的感知 AI Prediction sense config
+- 视觉的感知 AI sight config
+- 团队的感知 AI Team sense config
+- 触觉的感知 AI Touch config
 
 # 40. 在UE4的C++中调用父类的函数，如何操作？
-
+```cpp
+Super::BeginPlay()
+```
 # 41. UE4内置的伤害接口是什么，有哪些类型？
-
+```cpp
+    // GameplayStatic.h
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Game|Damage")
+	static float ApplyDamage(AActor* DamagedActor, float BaseDamage, AController* EventInstigator, AActor* DamageCauser, TSubclassOf<class UDamageType> DamageTypeClass);
+```
+- struct FPointDamageEvent  /**Damage subclass that handles damage with a single impact location and source direction */
+- struct FRadialDamageEvent /** Damage subclass that handles damage with a source location and falloff radius */
 # 42. UE4的蓝图部分在版本控制软件中无法进行比较，你是否有好的解决方案？
-
+写代码吧，业务逻辑用lua
 # 43. UE4中的联网会话节点有哪些？
 
 # 44. UE4中的字符串有哪些？
