@@ -136,6 +136,10 @@ Actor的同步分为属性同步和RPC，属性同步会在属性变化时就会
 ```cpp
 Socket->Connect(*addr);
 ```
+控制台命令
+```
+open 127.0.0.1
+```
 # 20. 为什么需要TWeakPtr？
 类似于C++ std::weak_ptr, 防止循环引用。使用时，Get一下判断引用的对象是否还存在。
 
@@ -309,17 +313,48 @@ openLevel levelName
 # 53. 在C++中为对象设置默认值有哪些方法？
 
 # 54. C++中Reliable的意义是什么，该如何实现对应的操作？
-
+表示该RPC是可靠的RPC， UE会用UDP模仿TCP，来保证RPC严格按序达到远端，适用于对GamePlay很关键但不经常调用的函数，包括碰撞事件，武器发射的开始或者结束，或生成Actor。
 # 55. 如果项目中需要专用服务器，如何操作？
-
+- 通过源码编译好Development Server
+- 打包客户端成exe
+- 启动好server，然后用client去连接server
+[使用Dedicated Server](https://zhuanlan.zhihu.com/p/46415816)
 # 56. UE4中的Delegates有哪些？
-
+- 单播
+- 多播
+- 动态单播
+- 动态多播
+- 事件
 # 57. 如何分析性能瓶颈在哪儿？
-
+- stat
+- unreal fornted profiler
+- unreal insights
 # 58. UE4的碰撞类型有哪些？
+- No Collision
+- Query Only
+- Phsics Only
+- Collision Enable(Query and Physics)
+```cpp
+	/**
+	* Type of collision enabled.
+	* 
+	*	No Collision      : Will not create any representation in the physics engine. Cannot be used for spatial queries (raycasts, sweeps, overlaps) or simulation (rigid body, constraints). Best performance possible (especially for moving objects)
+	*	Query Only        : Only used for spatial queries (raycasts, sweeps, and overlaps). Cannot be used for simulation (rigid body, constraints). Useful for character movement and things that do not need physical simulation. Performance gains by keeping data out of simulation tree.
+	*	Physics Only      : Only used only for physics simulation (rigid body, constraints). Cannot be used for spatial queries (raycasts, sweeps, overlaps). Useful for jiggly bits on characters that do not need per bone detection. Performance gains by keeping data out of query tree
+	*	Collision Enabled : Can be used for both spatial queries (raycasts, sweeps, overlaps) and simulation (rigid body, constraints).
+	*/
+    	UPROPERTY(EditAnywhere, Category=Custom)
+	TEnumAsByte<ECollisionEnabled::Type> CollisionEnabled;
+```
+| 属性 | 说明 |
+| ---- | ---- | 
+|无碰撞（No Collision）| 在物理引擎中此形体将不具有任何表示。不可用于空间查询（光线投射、Sweep、重叠）或模拟（刚体、约束）。此设置可提供最佳性能，尤其是对于移动对象。|
+|仅查询（Query Only）| 此形体仅可用于空间查询（光线投射、Sweep和重叠）。不可用于模拟（刚体、约束）。对于角色运动和不需要物理模拟的对象，此设置非常有用。通过缩小物理模拟树中的数据来实现一些性能提升。|
+|仅物理（Physics Only）| 此形体仅可用于物理模拟（刚体、约束）。不可用于空间查询（光线投射、Sweep、重叠）。对于角色上不需要按骨骼进行检测的模拟次级运动，此设置非常有用。通过缩小查询树中的数据来实现一些性能提升。|
+|启用碰撞（Collision Enabled）| 此形体可用于空间查询（光线投射、Sweep、重叠）和模拟（刚体、约束）。|
 
 # 59. UE4的服务器是否适应于MMO？若不适应，有什么解决方案？
-
+不适应，至少我们项目的服务器是自己搞的一套，甚至都没用上UE的这套rpc
 # 60. 动画蓝图是否支持同步？若不支持，有什么解决方案？
 
 # 61. 材质参数、特效参数、声音参数如何使用？
