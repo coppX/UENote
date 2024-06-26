@@ -260,8 +260,20 @@ Super::BeginPlay()
 # 41. UE4内置的伤害接口是什么，有哪些类型？
 ```cpp
     // GameplayStatic.h
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Game|Damage")
-	static float ApplyDamage(AActor* DamagedActor, float BaseDamage, AController* EventInstigator, AActor* DamageCauser, TSubclassOf<class UDamageType> DamageTypeClass);
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Game|Damage")
+    static float ApplyDamage(AActor* DamagedActor, float BaseDamage, AController* EventInstigator, AActor* DamageCauser, TSubclassOf<class UDamageType> DamageTypeClass);  
+    //->{
+    //      ...
+    //      DamagedActor->TakeDamage()
+    //      ...
+    //  };
+    // Actor.h
+    virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser);
+    // DamageEvents.h
+    USTRUCT()
+    struct ENGINE_API FPointDamageEvent : public FDamageEvent{...}
+    USTRUCT()
+    struct ENGINE_API FRadialDamageEvent : public FDamageEvent
 ```
 - struct FPointDamageEvent  /**Damage subclass that handles damage with a single impact location and source direction */
 - struct FRadialDamageEvent /** Damage subclass that handles damage with a source location and falloff radius */
@@ -364,15 +376,26 @@ openLevel levelName
 # 63. C++中如何对组件或者Actor设置同步？
 
 # 64. UE4的AA算法有哪些？
+- MSAA
+- TAA
+- FXAA
 
 # 65. 四元数相对于欧拉角的优点。
-
+- 欧拉角有万向死锁问题
+- 不能对欧拉角进行插值
 # 66. 简述A*算法。
+f(n) = g(n) + h(n)
+g(n)是从起始点到当前点的代价，也就是起点到当前点的距离，h(n)是从当前点到目的点的预估代价，一般是曼哈顿距离(x，y轴距离之和)
+流程:
+- 创建两个空表，open表和close表，并将起始点放入open表，并更新里面所有点的f(n)值
+- 从open表里面选择f(n)值最小的节点A取出，判断A是否是目标点，如果是则算法结束。
+- 如果A不是目标点，将A点放入close表，并将这个点紧邻的点放入到open表中(不在close中的点)，然后更新open表中所有点的f(n)值。重复上面步骤。
 
 # 67. UE4中需要对一个原本不支持寻路的Actor实现寻路功能，如何实现？
 
 # 68. UI中的锚是用来干什么的？
-
+锚（Anchor）用来定义 UI 控件在 画布面板 上的预期位置，并在不同的屏幕尺寸下维持这一位置 。锚也可以理解为就是用来设置布局方式的，随着屏幕尺寸的改变，定义这个UI相对于父节点怎么停靠以及是否拉伸。
+![](./Anchor.png)
 # 69. 如何基于UE4的网络接口，实现一个网络层，如Steam？
 
 # 70. 对于打包之后的游戏资源，有什么加密方案？
