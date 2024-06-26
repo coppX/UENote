@@ -266,23 +266,46 @@ Super::BeginPlay()
 # 43. UE4中的联网会话节点有哪些？
 
 # 44. UE4中的字符串有哪些？
+- FName 资源名字字符串
+- FText 显示字符串
+- FString 可以被操作的字符串，开销大于上面两种
 
 # 45. 获取和释放角色如何操作？
-
+获取
+- 方法1, 在editor中把character拖到场景中，右侧的auto possess player选择player0
+- 方法2, 查看wordSetting设置好的GameMode，设置里面的Default Pawn class为我们想要控制的角色，然后在场景中放置一个playerStart出生位置就可以了。
+- 方法3, 代码中获取到Character，调用PossessedBy传入Controller即可。
+- 方法4，代码中获取到Controller，调用Possess传人Character即可
+释放:
+- 方法1，代码中对Character调用UnPossess
+- 方法2，代码中对Controller调用UnPossess
 # 46. 设置地图的游戏模式，有哪些方法？
-
+- 编辑器中选择左上角edit->ProjectSettings->Map&Modes->Default GameMode
+- 编辑器中选择左上角windoww->worldSettings->GameMode Override选择我们想要的GameMode
 # 47. 玩家操作事件放在PlayerController和Pawn中，该如何选择？
-
+放在Controller中：
+- 从概念上：如果是一些Pawn本身固有的能力逻辑，如前进后退、播放动画、碰撞检测之类的就完全可以在Pawn内实现；而对于一些可替换的逻辑，或者智能决策的，就应该归Controller管辖。
+- 从对应上: 如果一个逻辑只属于某一类Pawn，那么其实你放进Pawn内也挺好。而如果一个逻辑可以应用于多个Pawn，那么放进Controller就可以组合应用了。
+- 从存在性上：Controller的生命期比Pawn要长一些，比如我们经常会实现的游戏中玩家死亡后复活的功能。对于那些需要在Pawn之外还要持续存在的逻辑和状态，放进Controller中是更好的选择。
 # 48. 切换关卡的命令是什么？
-
+openLevel levelName
 # 49. UE4中是否可以支持回放？如何操作？
-
+支持，利用网络同步的思想，把游戏本身当成一个服务器，游戏内容当成同步数据进行录制存储即可。
 # 50. UE4的蓝图类型有哪些？
-
+- 关卡蓝图
+- 普通蓝图
+- 游戏模式蓝图
+- 材质蓝图
+- Actor蓝图
+- Component蓝图
+- Widget蓝图
+- 动画蓝图
+...
 # 51. 添加一个USTRUCT MyStruct，是否可以？
 
 # 52. 若要C++中的属性暴露给蓝图，如何操作？
-
+加上UPROPERTY即可。
+提问，纯C++的stcut/class属性可以吗，没有反射的原生类型?
 # 53. 在C++中为对象设置默认值有哪些方法？
 
 # 54. C++中Reliable的意义是什么，该如何实现对应的操作？
