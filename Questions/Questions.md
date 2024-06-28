@@ -407,37 +407,111 @@ g(n)是从起始点到当前点的代价，也就是起点到当前点的距离�
 # 72. SpawnActor的位置不对，为什么？
 - 可能目标位置被其他actor占用
 # 73. 在BeginPlay之后调用了某个RPC操作，客户端却没有执行到，可能原因是什么？
-
+可能该Actor并不是本机actor(该actor的playercontroller不在本地)
 # 74. 在客户端没有连接到服务器之前，有什么同服务器进行通信的方案吗？
 
 # 75. 如何在Actor中增加command命令？
+- UFUNCTION(Exec/exec)
+- 复写ProcessConsoleExec()
+```cpp
+UCLASS()
+class LOSTTEMPLEDEV1_API AMyActor : public AActor
+{
+	GENERATED_BODY()
+	...
+	UFUNCTION(Exec)
+	void MantraDebugTest(const int32 Num);
 
+	UFUNCTION(Exec)
+	void MantraDebugTestNoParm();
+
+	virtual bool ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor) override;
+	...
+}
+
+void AMyActor::MantraDebugTest(const int32 Num)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[LogByMantra]" __FILE__ " at line %d\n%d"), __LINE__, Num);
+}
+
+void AMyActor::MantraDebugTestNoParm()
+{
+}
+
+void AMyActor::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor) override
+{
+
+}
+```
 # 76. 命令行中ce和ke有什么作用？
 - ce(CustomEvent) CE调用的是所有关卡中的函数和自定义事件
 - ke(KismestEvent)可以调用除了CDO外任何UObject内的函数，而且可以带参数
 
 # 77. UE4中的智能指针有哪些？
-
+- TSharedPtr
+- TSharedRef
+- TWeakPtr
+- TUniquePtr
+- TWeakObjectPtr
 # 78. 试描述你之前做过的项目中的部分功能。（没啥好说的，各个项目需求千差万别，主要目的是看有没有具体做过）
 
 # 79. 对根组件设置Scale会有问题吗？
-
+子组件会跟着变化(待确定)
 # 80. 如何在UE4中使用静态库或者动态库？
+## 1.DLL
+```cpp
+FPlatformProcess::GetDllHandle(dllFilePath);
+FPlatformProcess::GetDllExport(dllHandle, procName);
+```  
+
+上述方案主要是使用如下两个函数，先获取dll文件句柄，再通过dll句柄获取方法指针，最后通过获取的方法指针调用dll中的方法
+## 2.Lib
+将lib文件放到/Plugins/ThridParty/Debug中，在*.Build.cs文件中添加
+```cpp
+
+Definitions.AddRange(new string[] { "ASIO_STANDALONE", "MSGPACK_USE_CPP03" });
+ 
+// 第三方库debug目录
+string ThirdPartyPath = Path.Combine(PluginsPath, "ThirdParty/Debug");
+PublicLibraryPaths.Add(ThirdPartyPath);
+ 
+// 添加.lib文件
+PublicAdditionalLibraries.Add("asio-1.11.0.lib");
+PublicAdditionalLibraries.Add("msgpack-c-cpp-3.1.1.lib");
+ 
+PublicIncludePaths.AddRange(new string[] {
+	Path.Combine(PluginsPath, "asio-1.11.0/include"),
+	Path.Combine(PluginsPath, "msgpack-c-cpp-3.1.1/include"),
+```
 
 # 81. 试分析GameMode的运行流程，如从InitGame至Logout。（very hard， especially without source code）
 
 # 82. UE4的自动化测试如何搞？
 
 # 83. 多个摄像机之间如何切换？
-
+- 把多个相机参数做成配置Location Rotation FOV
+- 切换相机时，在PlayerCameraManager里面获取到要切换到的配置，然后从当前配置blend到新配置。
 # 84. 更新UI的方式有哪些？
-
+- 函数绑定
+![](./UI_Progress_Binding.png)  
+- 属性绑定
+![](./UI_Text_Property_Binding.png)
+- 事件绑定: 按需求自己去更新UI
+函数绑定和属性绑定是每帧都会去更新的一个操作，比较费，建议用事件触发。
 # 85. 如何区分并调节不同的音效？
 
 # 86. 如何销毁AIController？
-
+```cpp
+Pawn::DetachFromControllerPendingDestroy()
+```
 # 87. 在C++和蓝图中如何打印调试信息？
-
+```cpp
+UE_LOG(LogTemp, Log, TEXT("debug"))
+GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("debug"));
+UKismetSystemLibrary::DrawDebugString();
+//蓝图
+printString
+```
 # 88. 轴输入事件在值为0的时候会触发吗？
 
 # 89. 3DWidget如何使用？
@@ -447,7 +521,7 @@ g(n)是从起始点到当前点的代价，也就是起点到当前点的距离�
 # 91. 导航网格和寻路组件各有什么作用？
 
 # 92. 对于编译整个引擎耗费的大量时间，有什么解决方案？
-
+Incredibuild
 # 93. 如何联机构建光照？
 
 # 94. Montage是什么？
@@ -507,3 +581,5 @@ g(n)是从起始点到当前点的代价，也就是起点到当前点的距离�
 
 
 # CDO是什么
+
+# MVP变换
