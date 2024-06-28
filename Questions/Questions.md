@@ -413,6 +413,8 @@ g(n)是从起始点到当前点的代价，也就是起点到当前点的距离�
 # 75. 如何在Actor中增加command命令？
 
 # 76. 命令行中ce和ke有什么作用？
+- ce(CustomEvent) CE调用的是所有关卡中的函数和自定义事件
+- ke(KismestEvent)可以调用除了CDO外任何UObject内的函数，而且可以带参数
 
 # 77. UE4中的智能指针有哪些？
 
@@ -465,15 +467,43 @@ g(n)是从起始点到当前点的代价，也就是起点到当前点的距离�
 
 # Recast Navigation工作原理
 ## 一. recast
-- 体素化: 将矢量模型信息(三角形)转化为点阵信息(体素)，然后得到整个场景的高度场(HeightField)，其中的数据主要存储在rcHeightField中(如其中的rcSpan** spans)。对于一列体素，其中每个体素表示的区域或者为实体的，表示为有障碍的空间，或者为开放的，表示不包含障碍的空间。其中span代表高度跨度。
-- 过滤可行走表面，三角形法向量小于某个值可以行走，该三角形体素化后的span上方高度差小于walkableClimb的span也标记为可行走，如楼梯台阶，路沿。
-- 划分可行走表面为简单区域
-- 生成轮廓
-- 生成多边形网格
-- 生成细节网格
+- 1.体素化: 将矢量模型信息(三角形)转化为点阵信息(体素)，然后得到整个场景的高度场(HeightField)，其中的数据主要存储在rcHeightField中(如其中的rcSpan** spans)。对于一列体素，其中每个体素表示的区域或者为实体的，表示为有障碍的空间玩家不能通过，或者为开放的，表示不包含障碍的空间玩家能通过。其中span代表体素块高度跨度。  
+  执行rcMarkWalkableTriangles，标记源地形数据中可行走的三角形，把结果存储在m_triareas数组中。具体做法为计算三角形法向量，与walkableSlopeAngle属性相比较，小于这个倾斜角标记为可行走。
+
+  span:span是在光栅化操作生成体素时，计算三角形AABB包围盒在xz平面投影，然后遍历被投影覆盖的高度域的格子列，每个格子列与三角形相交的部分取最低点和最高点，中间部分就是新增加的span。新增span时，若与原有区间有重叠，则需要合并span，合并span时已经会考虑walkableClimb来设置area了。span的area属性取值就源于之前计算的m_triareas数组。
+
+- 2.过滤可行走面: 首先执行rcFilterLowHangingWalkableObstacles，过滤低垂的可行走障碍，若一个span标记为可行走，那么位于它上方且高度相差小于walkableClimb的span也应该标记为可行走。典型场景包括：楼梯台阶、路沿，这一步会扩大可行走区域判定。
+
+执行rcFilterLedgeSpans，过滤突起span，如果从span顶端到相邻区间下降距离超过了WalkableClimb，那么这个span被认为是个突起，不可行走。这里的相邻区域定义为前后左右四个方向。
+
+执行rcFilterWalkableLowHeightSpans，过滤可行走的低高度span。当span上方有距离小于walkableHeight的障碍物时，它的顶端表面也不可行走，因为容纳的高度不够。
+- 3.划分可行走表面为简单区域
+
+- 4.生成轮廓
+- 5.生成多边形网格
+- 6.生成细节网格
 
 ## 二. detour
-
+- 得到起始和终点所在的导航多边形
+- 使用A*算法得到Poly组成的路径
+- 使用漏斗算法平滑路径
 # UE 动画更新逻辑
+- Blead
+- Apply Additive节点
+- 状态机节点
+- AnimationNode底层是如何实现的（从Root向前，Update_AnyThread和Evaluate_AnyThread，异步)
 
 # UE和slua的交互原理
+
+# UObject GC算法
+- 标记unreachable
+- 
+
+
+# UI是怎么绘制的
+
+
+# UE的渲染逻辑
+
+
+# CDO是什么
