@@ -492,9 +492,9 @@ PublicIncludePaths.AddRange(new string[] {
 - 把多个相机参数做成配置Location Rotation FOV
 - 切换相机时，在PlayerCameraManager里面获取到要切换到的配置，然后从当前配置blend到新配置。
 # 84. 更新UI的方式有哪些？
-- 函数绑定
+- 函数绑定  
 ![](./UI_Progress_Binding.png)  
-- 属性绑定
+- 属性绑定  
 ![](./UI_Text_Property_Binding.png)
 - 事件绑定: 按需求自己去更新UI
 函数绑定和属性绑定是每帧都会去更新的一个操作，比较费，建议用事件触发。
@@ -519,13 +519,21 @@ printString
 # 90. 游戏中的AI技术有哪些？
 
 # 91. 导航网格和寻路组件各有什么作用？
-
+导航网格Navmesh
+导航组件NavLinkComponent
+		NavModifierComponent
+		NavigationInvokerComponent
 # 92. 对于编译整个引擎耗费的大量时间，有什么解决方案？
 Incredibuild
 # 93. 如何联机构建光照？
 
 # 94. Montage是什么？
-
+蒙太奇是一种动态播放角色动画的方法，通过slot节点和动画状态机可以融合到一块，如果状态机slot节点有蒙太奇输入，则状态机直接忽略掉slot前面的节点。(当然，蒙太奇动画如果是Additive形式的，那么状态机就会以Additive的形式叠加在slot的输入pose上)
+为什么需要蒙太奇:因为状态机并不完美
+- 状态机动画必须静态放到每个状态中，不能在运行时动态通过参数指定
+- 状态机会使整个状态网络越来越复杂，设计维护扩展都比较麻烦
+- 有些特殊动画，只能在某些少数特殊情况下才能被触发一两次，并不需要加入到状态机里面。
+- 有时逻辑上需要跳出状态机的控制，直接获取动画的控制。
 # 95. 执行动画时，将动画和声音、特效匹配的较好的方案是什么？
 
 # 96. 如何获取动画的执行事件？
@@ -556,7 +564,7 @@ Incredibuild
 - 4.生成轮廓
 - 5.生成多边形网格
 - 6.生成细节网格
-
+[UE动态创建寻路网格](https://blog.csdn.net/DuGuYiZhao/article/details/132624404)
 ## 二. detour
 - 得到起始和终点所在的导航多边形
 - 使用A*算法得到Poly组成的路径
@@ -567,16 +575,48 @@ Incredibuild
 - 状态机节点
 - AnimationNode底层是如何实现的（从Root向前，Update_AnyThread和Evaluate_AnyThread，异步)
 
-# UE和slua的交互原理
+# Animation Sequnence更新逻辑
+# UE和slua的交互原理，怎么保证GC正确
 
 # UObject GC算法
 - 标记unreachable
 - 
 
 
-# UI是怎么绘制的
+# UI是怎么绘制的，怎么优化
+.![](./SlatePaint.webp)
+Unreal的控件绘制是从FSlateApplication::DrawWindows开始，从SWindow::Paint开始派发，LayerId初始为0，UI绘制是一个深度优先遍历。递归过程如下:
+1. SWindow调用SWidget::Paint  
+2. 执行SWidget::Paint，并调用纯虚函数OnPaint，分发给各控件实现的OnPaint。  
+3. 执行各控件的OnPaint，完成绘制，如果包含子控件则调用子控件的Paint，回到第二步。  
+4. 直到所有控件绘制完。  
+```cpp
+Paint(..., int32 LayerId, ...) const
+{
+    int32 NewLayerId = OnPanit(..., LayerId, ...);
+	return NewLayerId;
+}
 
-
+OnPaint(..., int32 LayerId, ...) const
+{
+	int32 MaxLayerId = LayerId;
+	for (int32 Idx = 0; Idx < Children.Num(); ++Idx)
+	{
+        if (false)  // 只有CanvasPanel和Overlay有可能继承兄弟Widget的MaxLayerId
+		{
+			LayerId = MaxLayerId + 1;
+		}
+	    const int32 CurWidgetsMaxLayerId = Children[Idx]->Paint(..., LayerId, ...);
+	    MaxLayerId = FMath::Max(MaxLayerId, CurWidgetsMaxLayerId);
+	}
+	return LayerId/*or return MaxLayerId*/;
+}
+```
+优化:
+1. 合批:  
+在UI绘制的最后，会进入到渲染线程，进行渲染指令的合批和渲染。在合批的一开始，就会对所有的FSlateRenderBatch根据LayerId，从小到大排序。LayerId不同，不能合批。对一个控件的LayerId有影响的不仅仅有父控件，还有自己的兄弟控件，甚至还有SOverlay这样使用MaxLayerId的控件。
+2. 使用InvalidationBox和RetainerBox来降低OverDraw:  
+使用合批对性能的提升并不没有预期的大，难度很大。并且随着硬件发展，DrawCall已经不再是性能瓶颈。OverDraw才是重中之重，利用InvalidationBox减少UI Tick，以提高CPU性能。并使用RetainerBox来实现动静分离，降低OverDraw。
 # UE的渲染逻辑
 
 
