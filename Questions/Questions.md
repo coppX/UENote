@@ -577,6 +577,12 @@ Incredibuild
 
 # Animation Sequnence更新逻辑
 # UE和slua的交互原理，怎么保证GC正确
+### lua虚拟栈
+### lua的GC(Mark And sweep算法的四个阶段)
+- 扫描标记(Mark)
+- 清理阶段(Cleaning)
+- 清除阶段(Sweep)
+- 析构阶段(finalization)
 
 # UObject GC算法
 - 标记unreachable
