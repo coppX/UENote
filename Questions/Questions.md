@@ -570,7 +570,7 @@ Incredibuild
 - 使用A*算法得到Poly组成的路径
 - 使用漏斗算法平滑路径
 # UE 动画更新逻辑
-- Blead
+- Blend
 - Apply Additive节点
 - 状态机节点
 - AnimationNode底层是如何实现的（从Root向前，Update_AnyThread和Evaluate_AnyThread，异步)
@@ -579,10 +579,10 @@ Incredibuild
 # UE和slua的交互原理，怎么保证GC正确
 ### lua虚拟栈
 ### lua的GC(Mark And sweep算法的四个阶段)
-- 扫描标记(Mark)
-- 清理阶段(Cleaning)
-- 清除阶段(Sweep)
-- 析构阶段(finalization)
+- 扫描标记(Mark): 对Lua中所有的对象进行一次扫描。如果某个对象和其他对象有引用关系，那么这个对象是有用的。如果这个对象和其他对象都没有引用关系，那么说明这个对象已经可以被回收掉了。
+- 清理阶段(Cleaning): 这个阶段lua会处理对象的析构和弱引用表，它会遍历标记需要析构的对象，并将这些对现象放在一个列表里，以及遍历弱引用表将要移除的键或者值。
+- 清除阶段(Sweep): sweep阶段根据Mark阶段得到的结果，遍历一边所有的对象。如果这个对象已经被标记为不再使用了，就会被清理掉，释放内存。如果这个对象是有引用的，则清除其状态，等待下一次gc在对其进行标记。
+- 析构阶段(finalization): 对清理阶段标记为需要析构的对象进行析构。
 
 # UObject GC算法
 - 标记unreachable
@@ -590,7 +590,7 @@ Incredibuild
 
 
 # UI是怎么绘制的，怎么优化
-.![](./SlatePaint.webp)
+.![](./SlatePaint.webp)  
 Unreal的控件绘制是从FSlateApplication::DrawWindows开始，从SWindow::Paint开始派发，LayerId初始为0，UI绘制是一个深度优先遍历。递归过程如下:
 1. SWindow调用SWidget::Paint  
 2. 执行SWidget::Paint，并调用纯虚函数OnPaint，分发给各控件实现的OnPaint。  
@@ -622,7 +622,9 @@ OnPaint(..., int32 LayerId, ...) const
 1. 合批:  
 在UI绘制的最后，会进入到渲染线程，进行渲染指令的合批和渲染。在合批的一开始，就会对所有的FSlateRenderBatch根据LayerId，从小到大排序。LayerId不同，不能合批。对一个控件的LayerId有影响的不仅仅有父控件，还有自己的兄弟控件，甚至还有SOverlay这样使用MaxLayerId的控件。
 2. 使用InvalidationBox和RetainerBox来降低OverDraw:  
-使用合批对性能的提升并不没有预期的大，难度很大。并且随着硬件发展，DrawCall已经不再是性能瓶颈。OverDraw才是重中之重，利用InvalidationBox减少UI Tick，以提高CPU性能。并使用RetainerBox来实现动静分离，降低OverDraw。
+使用合批对性能的提升并不没有预期的大，难度很大。并且随着硬件发展，DrawCall已经不再是性能瓶颈。OverDraw才是重中之重，利用InvalidationBox减少UI Tick，以提高CPU性能。并使用RetainerBox来实现动静分离，降低OverDraw。  
+RetainerBox优化原理: 通过RetainerBox缓存渲染结果，每隔几帧更新一次。RetainerBox的原理就是将UI渲染缓存在RenderTarget上，再将RenderTarget渲染到屏幕。  
+InValidataionBox优化原理: 使用InvalidationBox封装UserWidget，从而缓存Slate Tick数据，不需要每帧都计算。在 Invalidation Box 下的所有 Prepass 和 OnPaint 计算结果都会被缓存下来。如果某个 Child Widget 的渲染信息发生变化，就会通知 Invalidation Box 重新计算一次 Prepass 和 OnPaint 更新缓存信息。  
 # UE的渲染逻辑
 
 
