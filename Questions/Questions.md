@@ -572,17 +572,39 @@ Incredibuild
 # UE 动画更新逻辑
 ## Blend  
 混合可以说是骨骼动画中最常见的操作了，有两种最为常见的混合方式，混合做的事情就是对各个骨骼的transform进行混合
-- blend节点: 这个是对Transform做插值，用Alpha来控制两个Transform的比例，比如经常用于动画过渡，还有BlendSpace都是用的这种混合。对应的混合接口为BlendTransform
-- Apply Additive节点: Additive是一种叠加动画，比如给头部叠加上下左右看来LookAt, 射击时叠加上下瞄准姿势，转弯时叠加倾斜。Additive是对特征的融合，就好比把两个特征向量相加，所以这里对Transform进行相加，具体的接口为BlendFromIdentityAndAccumulate。  
-![](./Blend.webp)   
+- blend节点(FAnimNode_TwoWayBlend): 这个是对Transform做插值，用Alpha来控制两个Transform的比例，比如经常用于动画过渡，还有BlendSpace都是用的这种混合。对应的混合接口为BlendTransform
+- Apply Additive节点(FAnimNode_ApplyAdditive): Additive是一种叠加动画，比如给头部叠加上下左右看来LookAt, 射击时叠加上下瞄准姿势，转弯时叠加倾斜。Additive是对特征的融合，就好比把两个特征向量相加，所以这里对Transform进行相加，具体的接口为BlendFromIdentityAndAccumulate。  
+![](./Blend.webp)  
 叠加过程是在基础姿势上在叠加一个姿势，这涉及到几个姿势的概念:
-1. 基础原姿势，我们要在这个姿势上面叠加一个内容来得到最终姿势
-2. 叠加姿势，一般是美术给到的一个动画资源，需要设置叠加
-3. 叠加Base姿势，叠加姿势对于Base姿势的相对姿势就是我们需要的叠加内容。
+  1. 基础原姿势，我们要在这个姿势上面叠加一个内容来得到最终姿势
+  2. 叠加姿势，一般是美术给到的一个动画资源，需要设置叠加
+  3. 叠加Base姿势，叠加姿势对于Base姿势的相对姿势就是我们需要的叠加内容。
 ![](./Additive.webp)
-- 状态机节点
+![](./AdditiveSetting.webp)
+图中类型如下:
+  a. 为叠加类型(No Additive无叠加, Local Space本地空间叠加, Mesh Space网格体空间叠加)
+  b. 叠加Base姿势类型, 即确定什么姿势作为Base(None, Skeletal Reference Pose参考姿势作为叠加Base, Selected animation Scaled选取整段动画作为Base, Selected animation frame选取动画某一帧为Base, Frame From this animation本动画某一帧为Base)
+  c. 为叠加Base动画资源
+  d. 叠加Base动画中的具体哪一帧  
+  如果选取的叠加类型是Local Space，那么在动画图表(AnimGraph)里用Apply Additive节点，如果选取的是Mesh Space类型，那么在动画蓝图里面，需要用Apply Mesh Space Additive节点。
+- 动画节点是FAnimNode_Base, 状态机节点是FAnimNode_StateMachine，动画树的根节点是FAnimNode_Root(状态机的结果节点Output Animation Pose和动画图表里面的Output Pose)。
 - AnimationNode底层是如何实现的（从Root向前，Update_AnyThread和Evaluate_AnyThread，异步)
+## Output Pose计算
+![](./Output.webp)
+1. Output节点是Root节点，通过FPoseLinkBase开始往前找，找到了Apply Additive。
+2. Apply Additive也会通过FPoseLinkBase往前找，然后在两个动画序列上进行采样，得到两个Pose。
+3. Apply Additive会对Pose进行混合，最后把结果传给了Output Pose。
+## 优化
+- 将UpdateAnimation和EvaluateAnimation放到子线程去，动画蓝图里面的节点也要尽量搞成FastPath。
+- 根据情况减少动画蓝图里面的Notify/NotifyState, 动画通知都是等到动画从子线程回来后才在GameThread做的，如果通知回调内容很重，这开销就很重。
+- 尽量不要用RootMotion，RootMotion会影响到能否在子线程上执行，要用也最多用只有用蒙太奇的RootMotion，另外本身RootMotion也会有一下网络同步问题。
+- 开启URO(UpdateRateOptimizations)，URO允许动画跳帧，远处的屏占比比较低的动画更新频率低一些，这样可以显著节省Tick开销。推荐结合官方的动画预算分配器插件来使用，可以规划好每帧动画固定的预算，根据重要度来动态调整URO甚至关闭Tick。
+- 修改动画tick类型
+![](./AnimTickType.webp)
+尝试切换不同的类型，其中AlwaysTickPoseAndRefreshBones最耗，OnlyTickPoseWhenRendered最省。
+-从动画本身来说，也尽可能让动画蓝图做的简单一些，尽量让最经常运行的那条路径短一些。也可以继承AnimInstance并封装或合并一些计算的函数。
 
+[UE4/5动画的原理和优化](https://zhuanlan.zhihu.com/p/545596818)
 # Animation Sequnence更新逻辑
 # UE和slua的交互原理，怎么保证GC正确
 ### lua虚拟栈
