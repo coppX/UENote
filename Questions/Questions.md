@@ -594,6 +594,11 @@ Incredibuild
 1. Output节点是Root节点，通过FPoseLinkBase开始往前找，找到了Apply Additive。
 2. Apply Additive也会通过FPoseLinkBase往前找，然后在两个动画序列上进行采样，得到两个Pose。
 3. Apply Additive会对Pose进行混合，最后把结果传给了Output Pose。
+
+## 动画蓝图时序
+1. 首先执行的是BlueprintUpdateAnimation，就是平时动画蓝图里面设置各种变量的地方
+2. 其次是各个节点的更新，对应的函数为FAnimNode_Base::Update_AnyThread。很多节点需要每Tick做一些事情，比如Sequence Evaluator，状态机节点都需要执行更新。
+3. 最后就是计算Pose，对应的函数为FAnimNode_Base::Evaluate_AnyThread。
 ## 优化
 - 将UpdateAnimation和EvaluateAnimation放到子线程去，动画蓝图里面的节点也要尽量搞成FastPath。
 - 根据情况减少动画蓝图里面的Notify/NotifyState, 动画通知都是等到动画从子线程回来后才在GameThread做的，如果通知回调内容很重，这开销就很重。
@@ -607,9 +612,37 @@ Incredibuild
 [UE4/5动画的原理和优化](https://zhuanlan.zhihu.com/p/545596818)
 # Animation Sequnence更新逻辑
 # UE和slua的交互原理，怎么保证GC正确
+参考slua demo, 通过LuaActor中luafilePath，将lua文件关联到luaActor，然后在游戏启动时通过LuaOverrider::bindOverrideFuncs把lua绑定到luaActor上，具体操作就是
+```cpp
+ // 加载
+ LuaOverrider::bindOverrideFuncs()
+ // 调用	
+ LuaNet::addClassRPC();//luaNet->addClassRPC(L, cls, luaFilePath)
+ // 调用
+ LuaNet::addClassRPCRecursive()
+ // 调用
+ LuaState::requireModule(luaFilePath)
+ // 调用
+ require()
+ //然后将加载的结果保存
+ ULuaOverrider::addObjectTable(L, obj, luaSelfTable, bHookInstancedObj);
+```
+这样C++就和lua文件一一关联起来了，C++这边持有lua的引用，当Actor这边删除，才会remove掉这个引用
+```cpp
+LuaOverrider::NotifyUObjectDeleted()
+{
+ 	ULuaOverrider::removeObjectTable(obj)
+}
+```
 ### lua虚拟栈
+
+### lua的GC
 在lua中，一共有8中数据类型，分别为nil、boolean、userdata、number、string、table、function、thread。其中，只有string、table、function、thread四种是以引用方式共享，是需要被GC管理回收的对象。
-### lua的GC(Mark And sweep算法的四个阶段)
+#### 标记状态
+- white状态: 待访问状态。表示对象还没被垃圾回收标记过程访问到。
+- gray状态: 带扫描状态。表示对象已经被垃圾回收访问到了，但是对象本身和其他对象之间的引用还没有进行遍历访问。
+- black状态: 已扫描状态。表示对象已经被访问到了，并且也已经遍历了此对象和其他对象直接是否有引用
+#### lua增量式GC(Mark And sweep算法的四个阶段)
 - 扫描标记(Mark): 对Lua中所有的对象进行一次扫描。如果某个对象和其他对象有引用关系，那么这个对象是有用的。如果这个对象和其他对象都没有引用关系，那么说明这个对象已经可以被回收掉了。
 - 清理阶段(Cleaning): 这个阶段lua会处理对象的析构和弱引用表，它会遍历标记需要析构的对象，并将这些对现象放在一个列表里，以及遍历弱引用表将要移除的键或者值。
 - 清除阶段(Sweep): sweep阶段根据Mark阶段得到的结果，遍历一边所有的对象。如果这个对象已经被标记为不再使用了，就会被清理掉，释放内存。如果这个对象是有引用的，则清除其状态，等待下一次gc在对其进行标记。
@@ -621,7 +654,9 @@ Incredibuild
 - _mode = "k" ---代表这个表中的键是弱引用的弱引用表
 - _mode = "v" ---代表这个表中的值是弱引用的弱引用表
 - _mode = "kv" ---代表这个表中的键值都是弱引用的弱引用表
-无论那种情况，只要其中一个键或者值被回收了，那么整个键值对都会被回收，这个我们把一个变量置空是一个原理。
+无论那种情况，只要其中一个键或者值被回收了，那么整个键值对都会被回收，这个我们把一个变量置空是一个原理。  
+
+lua的增量式GC和分代式GC可以通过collectgarbage函数的参数来设置(incrmental:增量式，generational:分代式)。
 # UObject GC算法
 - 标记unreachable
 - 
@@ -669,3 +704,16 @@ InValidataionBox优化原理: 使用InvalidationBox封装UserWidget，从而缓�
 # CDO是什么
 
 # MVP变换
+## 缩放
+## 旋转
+## 平移
+## 齐次坐标
+
+# Top K算法的几种解法
+
+# GAS
+## ASC(Ability System Component)
+## GA(Gameplay Ability)
+## AS(Attribute Set)
+## GE(Gameplay Effect)
+## GC(Gameplay Cue)
